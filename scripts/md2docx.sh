@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# 批量 md -> docx，使用 base64 内嵌的中文参考模板（规避 SkillHub 禁止二进制文件的限制）
+# 批量 md -> docx，使用本 skill 内置的中文参考模板
+# 模板：assets/cn-reference.docx（正文宋体、标题黑体加粗、纯黑白底）
 # 用法: bash md2docx.sh <md目录> [输出目录，默认与源同目录]
+#
+# 依赖：pandoc 3.x
+# 可选环境变量：PANDOC  指定 pandoc 路径（默认 E:/markdown/pandoc-3.10/pandoc.exe）
+
 set -euo pipefail
 
 PANDOC="${PANDOC:-E:/markdown/pandoc-3.10/pandoc.exe}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-B64="$(cd "$(dirname "$0")/.." && pwd)/assets/cn-reference.b64"
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+REF="$SKILL_DIR/assets/cn-reference.docx"
 
 usage() { echo "用法: bash md2docx.sh <md目录> [输出目录]"; exit 1; }
 [ $# -lt 1 ] && usage
@@ -13,12 +18,11 @@ INDIR="$1"
 OUTDIR="${2:-$INDIR}"
 mkdir -p "$OUTDIR"
 
-# 解码 base64 内嵌模板 -> 临时 docx（用 Windows 路径供 pandoc 读取）
-TMPDOCX="$(mktemp -t cnref.XXXXXX.docx)"
-cleanup() { rm -f "$TMPDOCX"; }
-trap cleanup EXIT
-base64 -d "$B64" > "$TMPDOCX"
-REF_WIN="$(cygpath -w "$TMPDOCX" | tr '\\' '/')"
+if [ ! -f "$PANDOC" ]; then echo "找不到 pandoc: $PANDOC（可用 PANDOC=... 覆盖）"; exit 1; fi
+if [ ! -f "$REF" ]; then echo "找不到模板: $REF"; exit 1; fi
+
+# pandoc 是 Windows 程序，reference-doc 需传 Windows 风格路径
+REF_WIN="$(cygpath -w "$REF" | tr '\\' '/')"
 
 count=0
 for f in "$INDIR"/*.md; do

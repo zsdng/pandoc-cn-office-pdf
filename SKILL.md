@@ -36,16 +36,15 @@ Office/WPS 主题染成蓝标题绿背景，也不会把中文渲染成 MS Gothi
 ### 转 DOCX（核心能力）
 
 ```bash
-# 1) 先解码内嵌的 base64 模板到临时 docx
-base64 -d "<skill-dir>/assets/cn-reference.b64" > /tmp/cn-ref.docx
-# 2) 用解码出的模板转 DOCX（路径需 Windows 风格）
+# 用内置中文模板转 DOCX（路径需 Windows 风格）
 pandoc input.md -s \
-  --reference-doc="$(cygpath -w /tmp/cn-ref.docx | sed 's|\\|/|g')" \
+  --reference-doc="$(cygpath -w "<skill-dir>/assets/cn-reference.docx" | tr '\\' '/')" \
   -o output.docx
 ```
 
 `<skill-dir>` 为本 skill 所在目录。`-s`（standalone）必须带，否则不套用模板。
-> 注：原 `cn-reference.docx` 已改为 base64 文本 `cn-reference.b64` 内嵌（规避 SkillHub 禁止二进制文件的限制），运行时脚本自动解码还原，DOCX 效果不变。
+模板即 `assets/cn-reference.docx`：正文宋体、标题黑体加粗、全篇纯黑白底。
+> 若将来要上架 SkillHub（禁止上传二进制文件），可把 docx 编码成 base64 文本内嵌，见文末「自制 / 修改模板」第 6 步。
 
 ### 转 PDF（推荐：Chrome 内核，与 Typora 渲染一致）
 
@@ -57,10 +56,12 @@ CHROME="/c/Program Files/Google/Chrome/Application/chrome.exe"
 CSS="<skill-dir>/assets/github-md.css"
 
 # 1) MD -> 独立 HTML（内联资源 + GitHub 风格 CSS）。CSS 必须是 Windows 风格绝对路径！
-"$PANDOC" input.md -s --embed-resources --standalone --css="$(cygpath -w "$CSS" | sed 's|\\|/|g')" -o _tmp.html
+#    路径转换必须用 tr，不能用 sed 's|\\|/|g'——GNU sed 里 \| 是未闭合的"或"运算符，
+#    会报错并把路径变空，结果 PDF 完全没有样式（实测体积会从 ~300KB 掉到 ~50KB）
+"$PANDOC" input.md -s --embed-resources --standalone --css="$(cygpath -w "$CSS" | tr '\\' '/')" -o _tmp.html
 
 # 2) Chrome headless 打印成 PDF（A4，无页眉页脚）
-HTML_WIN="$(cygpath -w "$PWD/_tmp.html" | sed 's|\\|/|g')"
+HTML_WIN="$(cygpath -w "$PWD/_tmp.html" | tr '\\' '/')"
 "$CHROME" --headless --disable-gpu --no-pdf-header-footer --print-to-pdf="output.pdf" "file:///$HTML_WIN"
 rm -f _tmp.html
 ```
@@ -178,7 +179,7 @@ pandoc 是原生 Windows 程序，读不到 Git Bash 的 `/d/...` 路径。若 `
 # ❌ 报错且丢样式
 pandoc in.md -s --css="/d/skill/assets/github-md.css" -o out.html
 # ✅ 正确
-CSS_WIN="$(cygpath -w "/d/skill/assets/github-md.css" | sed 's|\\|/|g')"
+CSS_WIN="$(cygpath -w "/d/skill/assets/github-md.css" | tr '\\' '/')"
 pandoc in.md -s --css="$CSS_WIN" -o out.html
 ```
 
@@ -211,7 +212,8 @@ node -e 'const fs=require("fs");let x=fs.readFileSync("word/styles.xml","utf8");
 # 5. 打包（本机无 zip 命令，用 PowerShell）
 #    PowerShell: Compress-Archive -Path "refwork\*" -DestinationPath out.zip -Force
 mv out.zip cn-reference.docx
-# 6. 把 docx 编码成 base64 文本（上架 SkillHub 必须，不能放二进制）
+# 6.（可选）仅当要上架 SkillHub 时才需要：SkillHub 禁止上传二进制文件，
+#    需把 docx 编码成 base64 文本内嵌，并在转换脚本里先解码还原再用
 base64 -w0 cn-reference.docx > cn-reference.b64
 ```
 
